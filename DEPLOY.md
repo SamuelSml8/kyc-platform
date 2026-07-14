@@ -83,6 +83,7 @@ curl https://<worker-url>/health
 2. Configuración de build:
    - Framework preset: Vite
    - Root directory: `apps/web`
+   - Install command: `npm install`
    - Build command: `npm run build`
    - Build output directory: `dist`
 3. Variable de entorno (Production):
