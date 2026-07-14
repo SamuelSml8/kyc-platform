@@ -20,10 +20,6 @@ Mini plataforma de validación de identidad (KYC).
 | Frontend | https://kyc-platform.pages.dev |
 | API | https://kyc-platform-api.veramirandasamuel6.workers.dev |
 
-## Herramientas de desarrollo
-
-El desarrollo se inició con **Antigravity 2.0** como apoyo para generar y organizar el código. La evidencia de esa sesión (capturas) se conserva de forma local y no se incluye en el repositorio.
-
 ## Arquitectura
 
 ```
