@@ -15,4 +15,4 @@ bucket_name = "kyc-images"
 preview_bucket_name = "kyc-images"
 
 [vars]
-CORS_ORIGIN = "http://localhost:5173"
+CORS_ORIGIN = "https://d2302c63.kyc-platform.pages.dev,https://kyc-platform.pages.dev,http://localhost:5173"
