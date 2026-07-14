@@ -1,0 +1,12 @@
+{
+  "name": "kyc-platform",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:api": "npm run dev --prefix apps/api",
+    "dev:web": "npm run dev --prefix apps/web",
+    "test:api": "npm test --prefix apps/api",
+    "build:web": "npm run build --prefix apps/web",
+    "deploy:api": "npm run deploy --prefix apps/api"
+  }
+}

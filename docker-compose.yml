@@ -1,0 +1,10 @@
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8787}
+    ports:
+      - "8080:80"
+    # API sigue corriendo aparte: cd apps/api && npm run dev
