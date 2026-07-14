@@ -1,105 +1,92 @@
 # KYC Platform
 
-Mini plataforma de validación de identidad (KYC) para assessment técnico.
+Mini plataforma de validación de identidad (KYC).
 
-**Stack:** React + Vite + TailwindCSS (Cloudflare Pages) · Hono.js (Cloudflare Workers) · D1 · TypeScript.
-
+**Autor:** Samuel Vera Miranda  
 **Repositorio:** https://github.com/SamuelSml8/kyc-platform
 
----
+## Stack
 
-## URLs públicas (deploy)
+| Capa | Tecnología | Deploy |
+|------|------------|--------|
+| Frontend | React + Vite + TailwindCSS + TypeScript | Cloudflare Pages |
+| Backend | Hono.js + TypeScript | Cloudflare Workers |
+| Datos | Cloudflare D1 + R2 | — |
 
-> Sustituye estos placeholders después de desplegar.
+## URLs de producción
 
 | Servicio | URL |
 |----------|-----|
-| Frontend (Pages) | `` |
-| API (Workers) | `` |
+| Frontend | _pendiente de despliegue_ |
+| API | _pendiente de despliegue_ |
 
----
+## Herramientas de desarrollo
 
-## Antigravity 2.0
-
-El brief pide iniciar el desarrollo con **Antigravity 2.0** (plataforma agent-first de Google) como herramienta de apoyo para generar y organizar código.
-
-- Se usó Antigravity para el arranque / organización del trabajo.
-- El refinamiento, arquitectura y calidad del código se cerraron en Cursor sobre este monorepo.
-- La evidencia (screenshots de la sesión) se guarda **fuera del repositorio** (no se suben chats ni secretos).
-
----
+El desarrollo se inició con **Antigravity 2.0** como apoyo para generar y organizar el código. La evidencia de esa sesión (capturas) se conserva de forma local y no se incluye en el repositorio.
 
 ## Arquitectura
 
 ```
 kyc-platform/
   apps/
-    api/   # Hono + Workers + D1
+    api/   # Hono + Workers + D1 + R2
     web/   # React + Vite + Tailwind
   Dockerfile
   docker-compose.yml
   README.md
+  DEPLOY.md
 ```
 
-Flujo:
+Flujo de negocio:
 
-1. El usuario envía datos + selfie + documento (`POST /verification`) → estado `pending`.
-2. Consulta el resultado (`GET /verification/:id`).
-3. Demo de revisión: `PATCH /verification/:id` con `{ "status": "approved" | "rejected" }` (sin auth; solo para la prueba — en producción llevaría control de acceso).
+1. El usuario envía datos, selfie y documento (`POST /verification`). El caso queda en `pending`.
+2. Se consulta el resultado con `GET /verification/:id`.
+3. En esta demo, la revisión se simula con `PATCH /verification/:id` (`approved` | `rejected`). En un entorno productivo ese endpoint debería exigir autenticación y autorización.
 
-Persistencia: **Cloudflare D1**.
+La metadata vive en **D1**. Las imágenes se almacenan en **R2** y se exponen mediante URLs del Worker (`/files/...`).
 
----
-
-## Requisitos locales
+## Requisitos
 
 - Node.js 20+
-- Cuenta [Cloudflare](https://dash.cloudflare.com/)
-- Wrangler CLI (viene como dep de `apps/api`)
+- Cuenta de [Cloudflare](https://dash.cloudflare.com/)
+- Wrangler (incluido en las dependencias de `apps/api`)
 
----
+## Desarrollo local
 
-## Setup local
-
-### 1. API
+### API
 
 ```bash
 cd apps/api
 npm install
-# Si venías del schema viejo (base64), borra la D1 local y migra de nuevo:
-# Remove-Item -Recurse -Force .wrangler
 npm run db:migrate:local
 npm run dev
 ```
 
-API en `http://localhost:8787`  
-Health: `GET /health`  
-Imágenes: R2 local vía Wrangler (binding `IMAGES`)
+- Base: `http://localhost:8787`
+- Health: `GET /health`
 
-### 2. Frontend
+### Frontend
 
 ```bash
 cd apps/web
 cp .env.example .env
-# VITE_API_URL=http://localhost:8787
 npm install
 npm run dev
 ```
 
-Web en `http://localhost:5173`
+- App: `http://localhost:5173`
+- Variable requerida: `VITE_API_URL=http://localhost:8787`
 
-### Tests API
+### Tests
 
 ```bash
 cd apps/api
 npm test
 ```
 
----
+## Contrato de la API
 
-## Contrato API
-
-Todas las respuestas JSON usan el mismo envelope (mensajes en inglés):
+Respuestas JSON con envelope uniforme (mensajes en inglés):
 
 ```json
 { "ok": true, "message": "...", "data": { } }
@@ -109,82 +96,70 @@ Todas las respuestas JSON usan el mismo envelope (mensajes en inglés):
 { "ok": false, "message": "...", "data": null }
 ```
 
-### `POST /verification` (multipart/form-data)
+### `POST /verification` — `multipart/form-data`
 
-Campos:
+| Campo | Tipo |
+|-------|------|
+| `name` | texto |
+| `email` | texto |
+| `documentNumber` | texto |
+| `selfie` | archivo (JPEG / PNG / WebP) |
+| `documentImage` | archivo (JPEG / PNG / WebP) |
 
-- `name`, `email`, `documentNumber` (texto)
-- `selfie`, `documentImage` (archivos imagen)
-
-La API sube las imágenes a **Cloudflare R2**, guarda solo las **keys** en D1 y responde URLs públicas del Worker (`/files/...`).
-
-Respuesta `201`: `data.selfie` y `data.documentImage` son URLs, no base64.
+`201`: el objeto en `data` incluye `status: "pending"` y URLs de imagen.
 
 ### `GET /verification/:id`
 
-`200` o `404` (`Verification not found.`).
+`200` o `404`.
 
 ### `GET /files/*`
 
-Sirve el binario desde R2 (para el preview en el front).
+Sirve el contenido almacenado en R2.
 
-### `PATCH /verification/:id` (demo de revisión)
+### `PATCH /verification/:id`
 
 ```json
 { "status": "approved" }
 ```
 
-o `"rejected"`.
+También acepta `"rejected"`.
 
-### Validaciones / seguridad básica
+### Validación y seguridad básica
 
-- Campos requeridos + email válido
-- Imágenes JPEG/PNG/WebP · máx. ~1 MB
-- D1 guarda keys; R2 guarda archivos
-- CORS restringido por `CORS_ORIGIN`
-- Envelope consistente éxito/error
-- Sin secretos en el repo
+- Campos obligatorios y formato de email
+- Imágenes JPEG/PNG/WebP, máximo ~1 MB
+- CORS limitado por `CORS_ORIGIN`
+- Sin secretos versionados en el repositorio
 
----
+## Despliegue
 
-## Deploy real (Cloudflare)
-
-Guía detallada: [DEPLOY.md](./DEPLOY.md)
+Pasos detallados en [DEPLOY.md](./DEPLOY.md).
 
 Resumen:
 
-1. Crear D1 + aplicar migraciones remotas + `wrangler deploy` en `apps/api`
-2. Configurar `CORS_ORIGIN` con el origin de Pages
-3. Desplegar `apps/web` en Cloudflare Pages (`VITE_API_URL` = URL del Worker)
-4. Pegar ambas URLs arriba en este README
+1. Provisionar D1 y R2, aplicar migraciones y desplegar el Worker.
+2. Desplegar el frontend en Cloudflare Pages con `VITE_API_URL` apuntando al Worker.
+3. Actualizar `CORS_ORIGIN` del Worker con el origin de Pages.
+4. Documentar las URLs públicas en este README.
 
----
+## Docker
 
-## Docker (bonus / local)
-
-Producción sigue siendo **Pages + Workers**. Docker sirve para previsualizar el front de forma reproducible:
+Pensado para preview local del frontend. La producción se sirve con Pages + Workers.
 
 ```bash
-# Con la API local en :8787
 docker compose up --build
-# → http://localhost:8080
 ```
 
----
+Disponible en `http://localhost:8080` (la API debe estar corriendo en `:8787`).
 
-## Bonus cubiertos
+## Bonus implementados
 
-| Bonus | Estado |
-|-------|--------|
-| TypeScript | Sí (api + web) |
-| D1 Database | Sí |
-| Drag & drop upload | Sí |
+| Ítem | Estado |
+|------|--------|
+| TypeScript | Sí |
+| D1 | Sí |
+| R2 (imágenes por URL) | Sí |
+| Drag & drop | Sí |
 | Dark mode | Sí |
-| Dockerfile | Sí (+ compose) |
-| Tests | Sí (`apps/api`) |
-
----
-
-## Commits
-
-Los commits se hacen de forma atómica y con mensajes claros cuando el autor lo indique (no se auto-commitea en el flujo de desarrollo).
+| Dockerfile | Sí |
+| Tests de API | Sí |

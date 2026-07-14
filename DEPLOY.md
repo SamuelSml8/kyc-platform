@@ -1,49 +1,44 @@
-# Deploy checklist — KYC Platform
+# Guía de despliegue — KYC Platform
 
-Producción: **Cloudflare Workers** (API) + **Cloudflare Pages** (web) + **D1** + **R2**.
+Entorno de producción:
 
-No inventar URLs: pega las reales en el [README](./README.md) cuando el deploy esté vivo.
+- API: Cloudflare Workers
+- Frontend: Cloudflare Pages
+- Persistencia: D1 (metadata) + R2 (imágenes)
 
----
-
-## 0. Prerrequisitos
+## Prerrequisitos
 
 ```bash
+cd apps/api
 npx wrangler login
 ```
 
-Cuenta Cloudflare lista (Free plan alcanza para esta demo).
+## 1. Backend
 
----
-
-## 1. Backend (Workers + D1 + R2)
-
-Desde `apps/api`:
-
-### 1.1 Crear la base D1
+### 1.1 Base de datos D1
 
 ```bash
 cd apps/api
 npx wrangler d1 create kyc-db
 ```
 
-Copia el `database_id` que imprime el comando y reemplaza el placeholder en [`wrangler.toml`](./apps/api/wrangler.toml):
+Actualizar `database_id` en `apps/api/wrangler.toml` con el valor generado:
 
 ```toml
 [[d1_databases]]
 binding = "DB"
 database_name = "kyc-db"
-database_id = "<TU_DATABASE_ID>"
+database_id = "<DATABASE_ID>"
 migrations_dir = "migrations"
 ```
 
-### 1.2 Crear bucket R2
+### 1.2 Bucket R2
 
 ```bash
 npx wrangler r2 bucket create kyc-images
 ```
 
-En `wrangler.toml` ya está el binding:
+Binding esperado en `wrangler.toml`:
 
 ```toml
 [[r2_buckets]]
@@ -51,96 +46,93 @@ binding = "IMAGES"
 bucket_name = "kyc-images"
 ```
 
-### 1.3 Migraciones remotas
+### 1.3 Migraciones
 
 ```bash
 npm run db:migrate:remote
 ```
 
-### 1.4 Variables de producción
+### 1.4 Variables
 
-En `wrangler.toml` o en el dashboard del Worker:
+Configurar en `wrangler.toml` o en el dashboard del Worker:
 
 ```toml
 [vars]
-CORS_ORIGIN = "https://TU-PROYECTO.pages.dev"
+CORS_ORIGIN = "https://<proyecto>.pages.dev"
 ```
 
-Si usas dominio custom, añade también ese origin (separados por coma):
+Durante el primer despliegue del Worker se puede dejar temporalmente `http://localhost:5173` y ajustarlo cuando Pages esté disponible.
 
-```toml
-CORS_ORIGIN = "https://TU-PROYECTO.pages.dev,https://tu-dominio.com"
-```
-
-> Tip: puedes desplegar el Worker primero con `http://localhost:5173`, subir Pages, y luego actualizar `CORS_ORIGIN` + redeploy.
-
-### 1.5 Deploy API
+### 1.5 Publicar el Worker
 
 ```bash
 npm run deploy
 ```
 
-Anota la URL (`https://kyc-platform-api.<subdomain>.workers.dev` o similar).
-
-Smoke test:
+Verificación:
 
 ```bash
-curl https://TU-WORKER/health
+curl https://<worker-url>/health
 ```
 
----
+## 2. Frontend (Cloudflare Pages)
 
-## 2. Frontend (Pages)
+### Opción A — Dashboard
 
-### Opción A — Dashboard Cloudflare Pages
+1. Workers & Pages → Create → conectar el repositorio `SamuelSml8/kyc-platform`.
+2. Configuración de build:
+   - Framework preset: Vite
+   - Root directory: `apps/web`
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+3. Variable de entorno (Production):
+   - `VITE_API_URL` = URL del Worker (sin barra final)
+4. Deploy.
 
-1. Workers & Pages → Create → Connect to Git → `SamuelSml8/kyc-platform`
-2. Build settings:
-   - **Framework preset:** Vite
-   - **Root directory:** `apps/web`
-   - **Build command:** `npm run build`
-   - **Build output directory:** `dist`
-3. Environment variables (Production):
-   - `VITE_API_URL` = `https://TU-WORKER-URL` (sin slash final)
-4. Deploy
-
-SPA: el archivo `apps/web/public/_redirects` envía rutas al `index.html`.
+El archivo `apps/web/public/_redirects` asegura el enrutado SPA.
 
 ### Opción B — CLI
 
 ```bash
 cd apps/web
-# Asegura VITE_API_URL en el entorno de build
+VITE_API_URL=https://<worker-url> npm run build
 npx wrangler pages deploy dist --project-name=kyc-platform
 ```
 
-(Build previo: `VITE_API_URL=https://TU-WORKER npm run build`)
+En Windows (PowerShell):
 
----
+```powershell
+cd apps/web
+$env:VITE_API_URL="https://<worker-url>"
+npm run build
+npx wrangler pages deploy dist --project-name=kyc-platform
+```
 
-## 3. Cerrar el circuito CORS
+## 3. CORS
 
-1. Copia el origin de Pages (`https://….pages.dev`)
-2. Ponlo en `CORS_ORIGIN` del Worker
-3. `cd apps/api && npm run deploy` de nuevo
+1. Tomar el origin de Pages (`https://….pages.dev`).
+2. Asignarlo a `CORS_ORIGIN` en el Worker.
+3. Volver a desplegar:
 
----
+```bash
+cd apps/api
+npm run deploy
+```
 
-## 4. Evidencia para la entrega
+## 4. Verificación funcional
 
-1. Abre la URL de Pages → completa el formulario → llega a detalle `pending`
-2. Aprobar / rechazar y recargar
-3. Screenshots + URLs públicas en el README
-4. Screenshots de Antigravity 2.0 **locales** (no en el repo)
+1. Abrir la URL de Pages.
+2. Enviar una verificación y confirmar estado `pending`.
+3. Probar aprobación y rechazo.
+4. Actualizar la tabla de URLs en el README.
 
----
+## Solución de problemas
 
-## 5. Troubleshooting
-
-| Problema | Qué revisar |
-|----------|-------------|
-| CORS en browser | `CORS_ORIGIN` exacto (https, sin path) |
-| 500 al crear | Migración D1 remota aplicada; binding `DB` |
-| Front llama a localhost | Rebuild Pages con `VITE_API_URL` correcta (Vite embebe en build) |
-| Imagen rechazada | Tamaño ≤ 1 MB; JPEG/PNG/WebP |
-| Ruta `/verification/:id` 404 en Pages | `_redirects` presente en el build (`dist/_redirects`) |
+| Síntoma | Revisión |
+|---------|----------|
+| Error CORS en el navegador | `CORS_ORIGIN` debe coincidir exacto con el origin de Pages |
+| HTTP 500 al crear | Migración remota aplicada y binding `DB` correcto |
+| El front llama a localhost | Rebuild de Pages con `VITE_API_URL` de producción |
+| Imagen rechazada | Máx. 1 MB; tipos JPEG/PNG/WebP |
+| 404 en rutas del SPA | Confirmar `dist/_redirects` en el artefacto de build |
+| Fallo al servir `/files/...` | Binding `IMAGES` y bucket R2 creados |
