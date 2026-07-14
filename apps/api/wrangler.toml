@@ -6,7 +6,7 @@ compatibility_flags = ["nodejs_compat"]
 [[d1_databases]]
 binding = "DB"
 database_name = "kyc-db"
-database_id = "local-kyc-db-placeholder"
+database_id = "48d9f543-7d0a-41c1-8128-e4cfd5063cba"
 migrations_dir = "migrations"
 
 [[r2_buckets]]
