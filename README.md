@@ -17,8 +17,8 @@ Mini plataforma de validación de identidad (KYC).
 
 | Servicio | URL |
 |----------|-----|
-| Frontend | _pendiente de despliegue_ |
-| API | _pendiente de despliegue_ |
+| Frontend | https://kyc-platform.pages.dev |
+| API | https://kyc-platform-api.veramirandasamuel6.workers.dev |
 
 ## Herramientas de desarrollo
 
