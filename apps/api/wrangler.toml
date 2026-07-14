@@ -1,0 +1,18 @@
+name = "kyc-platform-api"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "kyc-db"
+database_id = "local-kyc-db-placeholder"
+migrations_dir = "migrations"
+
+[[r2_buckets]]
+binding = "IMAGES"
+bucket_name = "kyc-images"
+preview_bucket_name = "kyc-images"
+
+[vars]
+CORS_ORIGIN = "http://localhost:5173"
